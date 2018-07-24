@@ -1316,8 +1316,12 @@ function check_field(){
 function show_tm_eula(){
 	$.get("tm_eula.htm", function(data){
 		document.getElementById('agreement_panel').innerHTML= data;
-		var url = "https://www.asus.com/Microsite/networks/Trend_Micro_EULA/" + document.form.preferred_lang.value;
+		var url = "https://www.asus.com/Microsite/networks/Trend_Micro_EULA/";
 		$("#eula_url").attr("href",url);
+		url = "https://www.trendmicro.com/en_us/about/legal/privacy-policy-product.html"
+		$("#tm_eula_url").attr("href",url);
+		url = "https://success.trendmicro.com/data-collection-disclosure";
+		$("#tm_disclosure_url").attr("href",url);
 		adjust_TM_eula_height("agreement_panel");
 	});
 
@@ -1620,7 +1624,7 @@ function change_scheduler(value){
 											<td colspan="2">
 												<select name="qos_overhead_preset" class="input_option" onchange="set_overhead(this);">
 												</select>
-												<input type="text" maxlength="4" class="input_6_table" name="qos_overhead" id="qos_overhead" onKeyPress="return validator.isNumber(this,event);" onblur="validate_number_range(this, -127, 128)" value="<% nvram_get("qos_overhead"); %>" style="margin-left:20px;">
+												<input type="text" maxlength="4" class="input_6_table" name="qos_overhead" id="qos_overhead" onKeyPress="return validator.isNumber(this,event);" onblur="validator.numberRange(this, -127, 128);" value="<% nvram_get("qos_overhead"); %>" style="margin-left:20px;">
 												<input type="checkbox" name="qos_atm_x" id="qos_atm_x" <% nvram_match("qos_atm", "1", "checked"); %>>ATM</input>
 											</td>
 										</tr>
