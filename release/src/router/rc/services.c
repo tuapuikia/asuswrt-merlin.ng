@@ -1693,6 +1693,10 @@ void start_dnsmasq(void)
 		/* If NTP isn't set yet, wait until rc's ntp signals us to start validating time */
 		if (!nvram_get_int("ntp_ready"))
 			fprintf(fp, "dnssec-no-timecheck\n");
+
+		if (nvram_match("dnssec_check_unsigned_x", "0"))
+			fprintf(fp, "dnssec-check-unsigned=no\n");
+
 	}
 #endif
 	if (nvram_match("dns_norebind", "1"))
@@ -3130,15 +3134,15 @@ start_ddns(void)
 #if defined(RTCONFIG_DUALWAN)
 	if (nvram_match("wans_mode", "lb")) {
 		int ddns_wan_unit = nvram_get_int("ddns_wan_unit");
-
 		if (ddns_wan_unit >= WAN_UNIT_FIRST && ddns_wan_unit < WAN_UNIT_MAX) {
 			unit = ddns_wan_unit;
 		} else {
-			int u = get_first_configured_connected_wan_unit();
-
+			int u = get_first_connected_public_wan_unit();
 			if (u < WAN_UNIT_FIRST || u >= WAN_UNIT_MAX)
+			{
+				logmessage("DDNS", "[%s] dual WAN load balance DDNS cannot succeed to work, because none of wan is public IP.", __FUNCTION__);
 				return -2;
-
+			}
 			unit = u;
 		}
 	}
@@ -3351,9 +3355,12 @@ asusddns_reg_domain(int reg)
 		if (ddns_wan_unit >= WAN_UNIT_FIRST && ddns_wan_unit < WAN_UNIT_MAX) {
 			unit = ddns_wan_unit;
 		} else {
-			int u = get_first_configured_connected_wan_unit();
+			int u = get_first_connected_public_wan_unit();
 			if (u < WAN_UNIT_FIRST || u >= WAN_UNIT_MAX)
+			{
+				logmessage("DDNS", "[%s] dual WAN load balance DDNS cannot succeed to work, because none of wan is public IP.", __FUNCTION__);
 				return -2;
+			}
 
 			unit = u;
 		}
@@ -3431,9 +3438,12 @@ asusddns_unregister(void)
 		if (ddns_wan_unit >= WAN_UNIT_FIRST && ddns_wan_unit < WAN_UNIT_MAX) {
 			unit = ddns_wan_unit;
 		} else {
-			int u = get_first_configured_connected_wan_unit();
+			int u = get_first_connected_public_wan_unit();
 			if (u < WAN_UNIT_FIRST || u >= WAN_UNIT_MAX)
+			{
+				logmessage("DDNS", "[%s] dual WAN load balance DDNS cannot succeed to work, because none of wan is public IP.", __FUNCTION__);
 				return -2;
+			}
 
 			unit = u;
 		}
@@ -5003,7 +5013,8 @@ int start_mdns(void)
 
 	// Execute avahi_daemon daemon
 	//xstart("avahi-daemon");
-	char *avahi_daemon_argv[] = {"avahi-daemon", NULL};
+	char *avadbg = nvram_match("ava_verb", "1")?"--debug":NULL;
+	char *avahi_daemon_argv[] = {"avahi-daemon", avadbg, NULL};
 	pid_t pid;
 
 	return _eval(avahi_daemon_argv, NULL, 0, &pid);
@@ -12646,6 +12657,13 @@ _dprintf("test 2. turn off the USB power during %d seconds.\n", reset_seconds[re
 	else if (strcmp(script, "reset_led") == 0)
 	{
 		reset_led();
+	}
+#endif
+#if defined(BCM_BSD) || defined(LANTIQ_BSD)
+	else if (strcmp(script,"bsd") == 0)
+	{
+		if(action&RC_SERVICE_STOP) stop_bsd();
+		if(action&RC_SERVICE_START) start_bsd();
 	}
 #endif
 	else if (strcmp(script, "clean_web_history") == 0)

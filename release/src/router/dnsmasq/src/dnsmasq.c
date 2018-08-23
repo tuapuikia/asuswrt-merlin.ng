@@ -771,7 +771,8 @@ int main (int argc, char **argv)
   if (option_bool(OPT_DNSSEC_VALID))
     {
       int rc;
-
+      struct ds_config *ds;
+      
       /* Delay creating the timestamp file until here, after we've changed user, so that
 	 it has the correct owner to allow updating the mtime later. 
 	 This means we have to report fatal errors via the pipe. */
@@ -792,6 +793,10 @@ int main (int argc, char **argv)
       
       if (rc == 1)
 	my_syslog(LOG_INFO, _("DNSSEC signature timestamps not checked until system time valid"));
+
+      for (ds = daemon->ds; ds; ds = ds->next)
+	my_syslog(LOG_INFO, _("configured with trust anchor for %s keytag %u"),
+		  ds->name[0] == 0 ? "<root>" : ds->name, ds->keytag);
     }
 #endif
 
@@ -819,7 +824,7 @@ int main (int argc, char **argv)
       if (daemon->resolv_files && !daemon->resolv_files->is_default)
 	my_syslog(LOG_WARNING, _("warning: ignoring resolv-file flag because no-resolv is set"));
       daemon->resolv_files = NULL;
-      if (!daemon->servers)
+      if (!daemon->servers && !daemon->servers_file)
 	my_syslog(LOG_WARNING, _("warning: no upstream servers configured"));
     } 
 
