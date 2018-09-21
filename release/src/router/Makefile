@@ -1167,7 +1167,7 @@ obj-y += networkmap
 ifneq ($(BUILD_NAME), $(filter $(BUILD_NAME), AC2900))
 obj-y += infosvr
 endif
-obj-y += ez-ipupdate
+#obj-y += ez-ipupdate
 ifneq ($(or $(RTN56U),$(DSLN55U)),y)
 obj-y += phddns
 endif
@@ -1234,6 +1234,8 @@ obj-$(RTCONFIG_OPENVPN) += ministun
 obj-$(RTCONFIG_DNSSEC) += nettle
 obj-$(RTCONFIG_SAMBA36X) += libiconv-1.14
 obj-$(RTCONFIG_TELENET) += lanauth
+obj-y += inadyn
+obj-y += libconfuse
 
 ifneq ($(HND_ROUTER),y)
 obj-y += cstats
@@ -3576,6 +3578,8 @@ ifeq ($(RTCONFIG_L2TP),y)
 	$(STRIP) $(INSTALLDIR)/pppd/usr/lib/pppd/*.so
 endif
 
+ez-ipupdate: openssl mssl
+
 ez-ipupdate-install:
 	install -D ez-ipupdate/ez-ipupdate $(INSTALLDIR)/ez-ipupdate/usr/sbin/ez-ipupdate
 	$(STRIP) $(INSTALLDIR)/ez-ipupdate/usr/sbin/ez-ipupdate
@@ -3913,7 +3917,7 @@ lldpd-0.9.8/Makefile:
 	CFLAGS="-g -O2 -I$(STAGEDIR)/usr/include" \
 	LDFLAGS="-L$(TOP)/lldpd-0.9.8/lib -lm -L$(STAGEDIR)/usr/lib -ljansson $(if $(RTCONFIG_AMAS),-L$(TOP)/json-c/.libs,)" \
 	--with-privsep-user=nobody --with-privsep-group=root --with-privsep-path=/var/run/lldpd \
-	$(if $(HND_ROUTER),,--enable-oldies) \
+	$(if $(RTCONFIG_HND_ROUTER),,--enable-oldies) \
 	$(if $(RTCONFIG_AMAS),--with-json=yes,)
 
 lldpd-0.9.8-install: lldpd-0.9.8
@@ -5388,11 +5392,10 @@ curl-7.21.7/Makefile: curl/configure
 	@cd curl && $(CONFIGURE) CC=$(CC) \
 		CFLAGS="-Os -Wall -ffunction-sections -fdata-sections" \
 		--prefix=/usr --bindir=/usr/sbin --libdir=/usr/lib \
-		--enable-http --with-ssl=$(TOP)/openssl/ssl \
+		--enable-http --with-ssl=$(TOP)/openssl \
 		$(if $(RTCONFIG_IPV6),--enable-ipv6) \
 		--disable-gopher --disable-dict --disable-telnet \
 		--disable-proxy --disable-manual --disable-libcurl-option \
-		CPPFLAGS='-I$(TOP)/openssl/include' \
 		LDFLAGS='$(LDFLAGS) -L$(TOP)/openssl' LIBS='-lcrypto -lssl -ldl' \
 		--with-ca-bundle=/etc/ssl/certs/ca-certificates.crt
 
@@ -6820,6 +6823,55 @@ libical-2.0.0-install:
 		ln -sf libicalss.so.2.0.0 libicalss.so.2 &&\
 		ln -sf libicalvcal.so.2.0.0 libicalvcal.so.2.0 &&\
 		ln -sf libicalvcal.so.2.0.0 libicalvcal.so.2
+
+libconfuse/Makefile:
+	cd libconfuse && $(CONFIGURE) \
+		CFLAGS="$(EXTRACFLAGS) -Os -I$(STAGEDIR)/usr/include -ffunction-sections -fdata-sections -fPIC -I$(TOP)/libiconv-1.14/include" \
+		LDFLAGS="$(LDFLAGS) -ffunction-sections -fdata-sections -Wl,--gc-sections -L$(TOP)/libiconv-1.14/lib/.libs -liconv" \
+		--prefix=/usr --disable-shared \
+		--without-libiconv-prefix --without-libintl-prefix --disable-examples --disable-nls
+
+libconfuse: libiconv-1.14 libconfuse/Makefile
+	@$(SEP)
+	$(MAKE) -C $@
+
+libconfuse-install:
+	@$(SEP)
+# Do nothing
+#	install -D libconfuse/src/.libs/libconfuse.so.1.1.0 $(INSTALLDIR)/libconfuse/usr/lib/libconfuse.so.1.1.0
+#	cd $(INSTALLDIR)/libconfuse/usr/lib && \
+#		ln -sf libconfuse.so.1.1.0 libconfuse.so.1 &&\
+#		ln -sf libconfuse.so.1.1.0 libconfuse.so
+#	$(STRIP) $(INSTALLDIR)/libconfuse/usr/lib/*.so.*
+
+
+libconfuse-clean:
+	@$(SEP)
+	$(MAKE) -C libconfuse distclean
+	rm libconfuse/Makefile
+
+inadyn/Makefile:
+	cd inadyn && $(CONFIGURE) \
+		confuse_CFLAGS="-I$(TOP)/libconfuse/src" \
+		confuse_LIBS="-L$(TOP)/libconfuse/src/.libs -lconfuse" \
+		OpenSSL_CFLAGS="-I$(TOP)/openssl" \
+		OpenSSL_LIBS="-L$(TOP)/openssl -lcrypto" \
+		CFLAGS="$(EXTRACFLAGS) -Os -I$(TOP)/shared -I$(SRCBASE)/include -I$(SRCBASE)/shared/bcmwifi/include -DTYPEDEF_FLOAT_T -I$(STAGEDIR)/usr/include -ffunction-sections -fdata-sections -fPIC -DASUSWRT $(if $(RTCONFIG_LETSENCRYPT),-DASUS_LE,)" \
+		LDFLAGS="$(LDFLAGS) $(shell if [[ "$(HND_ROUTER)" = "y" ]] ; then echo "-L$(TOP)/wlcsm -lwlcsm"; else echo ""; fi) -L$(TOP)/nvram$(BCMEX)$(EX7) -lnvram -L$(TOP)/shared -lshared $(if $(RTCONFIG_QTN),-L$(TOP)/libqcsapi_client -lqcsapi_client) -ffunction-sections -fdata-sections -Wl,--gc-sections" \
+		--prefix="" --enable-openssl
+
+inadyn: shared nvram${BCMEX}$(EX7) libconfuse inadyn/Makefile
+	@$(SEP)
+	$(MAKE) -C $@
+
+inadyn-install:
+	install -D inadyn/src/inadyn $(INSTALLDIR)/inadyn/usr/sbin/inadyn
+	$(STRIP) $(INSTALLDIR)/inadyn/usr/sbin/inadyn
+
+inadyn-clean:
+	@$(SEP)
+	$(MAKE) -C inadyn clean
+	rm inadyn/Makefile
 
 ncurses-6.0/Makefile: ncurses-6.0/configure
 	cd ncurses-6.0 && $(CONFIGURE) \
